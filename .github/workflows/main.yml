@@ -1,0 +1,42 @@
+# .github/workflows/renew.yml
+name: HidenCloud Auto Renew
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '34 18 * * 3'
+
+jobs:
+  renew-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # --- 修改点在这里 ---
+      - name: Install Playwright and dependencies
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Run Renew Script
+        env:
+          HIDENCLOUD_COOKIE: ${{ secrets.HIDENCLOUD_COOKIE }}
+          HIDENCLOUD_EMAIL: ${{ secrets.HIDENCLOUD_EMAIL }}
+          HIDENCLOUD_PASSWORD: ${{ secrets.HIDENCLOUD_PASSWORD }}
+        run: python -u renew_service.py
+
+      - name: Upload error artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshots-and-logs
+          path: |
+            *.png
