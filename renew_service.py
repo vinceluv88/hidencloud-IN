@@ -118,12 +118,20 @@ def renew_service(page):
         renew_button.wait_for(state="visible", timeout=30000)
         renew_button.click()
         log("✅ 'Renew' 按钮已点击。")
+        
+        # --- 等待 0.9 秒 ---
+        log("等待 0.9 秒...")
+        time.sleep(0.9)
 
         log("步骤 2: 正在查找并点击 'Create Invoice' 按钮...")
         create_invoice_button = page.locator('button:has-text("Create Invoice")')
         create_invoice_button.wait_for(state="visible", timeout=30000)
         create_invoice_button.click()
         log("✅ 'Create Invoice' 按钮已点击。")
+
+        # --- 等待 1.2 秒 ---
+        log("等待 1.2 秒...")
+        time.sleep(1.2)
 
         log("步骤 3: 正在等待发票页面加载并查找 'Pay' 按钮...")
         pay_button = page.locator('a:has-text("Pay"), button:has-text("Pay")').first
