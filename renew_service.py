@@ -123,7 +123,7 @@ def renew_service(page):
         log("等待 0.9 秒...")
         time.sleep(0.9)
 
-# +++ 修改后的终极方案代码 +++
+# +++ 最终版代码：直接捕获重定向后的URL +++
         log("步骤 2: 准备监听网络请求并点击 'Create Invoice' 按钮...")
         
         # 准备一个变量来存储我们捕获到的新URL
@@ -132,17 +132,10 @@ def renew_service(page):
         # 定义一个响应处理器函数
         def handle_response(response):
             nonlocal new_invoice_url
-            # 我们猜测创建发票的API请求URL中会包含'renew'
-            if "renew" in response.url and response.request.method == "POST":
-                try:
-                    # 尝试将响应解析为JSON
-                    json_response = response.json()
-                    # 在JSON数据中寻找包含'invoice'的URL
-                    if json_response.get('url') and 'invoice' in json_response['url']:
-                        new_invoice_url = json_response['url']
-                        log(f"🎉 成功捕获到新发票URL: {new_invoice_url}")
-                except Exception as e:
-                    log(f"解析响应时出错: {e}")
+            # 直接检查响应的最终URL是否是发票页面的URL
+            if "/payment/invoice/" in response.url:
+                new_invoice_url = response.url
+                log(f"🎉 成功捕获到重定向的发票URL: {new_invoice_url}")
 
         # 在点击之前，启动网络响应监听
         page.on("response", handle_response)
@@ -153,8 +146,12 @@ def renew_service(page):
         create_invoice_button.click()
         log("✅ 'Create Invoice' 按钮已点击，正在等待网络响应...")
 
-        # 等待一段时间让handle_response捕获到URL
-        page.wait_for_timeout(15000) # 等待最多15秒
+        # 使用一个更智能的循环来等待URL被捕获
+        timeout = 15  # seconds
+        for i in range(timeout):
+            if new_invoice_url:
+                break
+            page.wait_for_timeout(1000)
         
         # 停止监听，避免影响后续操作
         page.remove_listener("response", handle_response)
@@ -162,7 +159,11 @@ def renew_service(page):
         # 检查是否成功获取到URL
         if new_invoice_url:
             log(f"正在手动跳转到新发票页面: {new_invoice_url}")
-            page.goto(new_invoice_url, wait_until="networkidle", timeout=60000)
+            # 如果当前URL已经是目标URL，则无需跳转
+            if page.url != new_invoice_url:
+                 page.goto(new_invoice_url, wait_until="networkidle", timeout=60000)
+            else:
+                 log("浏览器已自动跳转到正确页面，无需手动跳转。")
         else:
             log("❌ 错误：未能从网络响应中捕获到新发票的URL。")
             raise Exception("Failed to capture new invoice URL from network response.")
