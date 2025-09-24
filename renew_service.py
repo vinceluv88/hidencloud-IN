@@ -133,6 +133,12 @@ def renew_service(page):
         log("等待 1.2 秒...")
         time.sleep(1.2)
 
+        # --- 智能等待：等待 URL 跳转到新的发票页面 ---
+        log("正在等待页面跳转至新生成发票的URL...")
+        # 等待URL中包含 "/payment/invoice/" 字段，这标志着页面已成功跳转
+        page.wait_for_url("**/payment/invoice/**", timeout=90000)
+        log("✅ 页面已成功跳转到发票页！")
+        
         log("步骤 3: 正在等待发票页面加载并查找 'Pay' 按钮...")
         pay_button = page.locator('a:has-text("Pay"), button:has-text("Pay")').first
         pay_button.wait_for(state="visible", timeout=90000)
