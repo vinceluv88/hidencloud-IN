@@ -41,43 +41,36 @@ def renew_service(page):
             log(f"导航至服务页面: {SERVICE_URL}")
             page.goto(SERVICE_URL, wait_until="networkidle", timeout=60000)
 
+        # 步骤 1: 点击 'Renew'
         log("步骤 1: 点击 'Renew'")
         renew_btn = page.locator('button:has-text("Renew"), a:has-text("Renew")')
-        renew_btn.first.wait_for(state="visible", timeout=30000)
+        renew_btn.first.wait_for(state="visible", timeout=60000)
         renew_btn.first.click()
         log("✅ 'Renew' 已点击")
         time.sleep(1)
 
-        log("步骤 2: 点击 'Create Invoice' 并监听网络响应")
+        # 步骤 2: 点击 'Create Invoice' 并等待网络响应
+        log("步骤 2: 点击 'Create Invoice' 并等待新发票 URL")
         create_invoice_btn = page.locator('button:has-text("Create Invoice"), a:has-text("Create Invoice")')
-        create_invoice_btn.first.wait_for(state="visible", timeout=30000)
-
-        new_invoice_url = None
-        def handle_response(resp):
-            nonlocal new_invoice_url
-            if "/payment/invoice/" in resp.url:
-                new_invoice_url = resp.url
-                log(f"🎉 捕获到新发票 URL: {new_invoice_url}")
-
-        page.on("response", handle_response)
+        create_invoice_btn.first.wait_for(state="visible", timeout=60000)
         create_invoice_btn.first.click()
         log("✅ 'Create Invoice' 已点击，等待网络响应...")
 
-        # 等待捕获到新的发票 URL
-        timeout = 15
-        for _ in range(timeout):
-            if new_invoice_url:
-                break
-            page.wait_for_timeout(1000)
-
-        page.remove_listener("response", handle_response)
-
-        if not new_invoice_url:
+        try:
+            response = page.wait_for_response(
+                lambda resp: "/payment/invoice/" in resp.url,
+                timeout=60000
+            )
+            new_invoice_url = response.url
+            log(f"🎉 捕获到新发票 URL: {new_invoice_url}")
+        except PlaywrightTimeoutError:
             raise Exception("❌ 未能捕获新发票 URL")
 
+        # 步骤 3: 跳转到新发票页面
         log(f"步骤 3: 跳转到新发票页面 {new_invoice_url}")
         page.goto(new_invoice_url, wait_until="networkidle", timeout=60000)
 
+        # 步骤 4: 查找可见的 'Pay' 按钮
         log("步骤 4: 查找可见的 'Pay' 按钮")
         pay_btn = page.locator('a:has-text("Pay"):visible, button:has-text("Pay"):visible').first
         pay_btn.wait_for(state="visible", timeout=60000)
