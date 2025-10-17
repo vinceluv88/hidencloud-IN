@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 HIDENCLOUD_COOKIE = os.environ.get('HIDENCLOUD_COOKIE')
 SERVICE_URL = "https://dash.hidencloud.com/service/72119/manage"
 COOKIE_NAME = "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d"
+MAX_RETRIES = 1  # 出错重试次数
 
 def log(msg):
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
@@ -53,14 +54,12 @@ def renew_service(page):
         log("步骤 2: 点击 'Create Invoice' 并等待新发票 URL")
         create_invoice_btn = page.locator('button:has-text("Create Invoice"), a:has-text("Create Invoice")')
         create_invoice_btn.first.wait_for(state="visible", timeout=60000)
-        create_invoice_btn.first.click()
-        log("✅ 'Create Invoice' 已点击，等待网络响应...")
 
         try:
-            response = page.wait_for_response(
-                lambda resp: "/payment/invoice/" in resp.url,
-                timeout=60000
-            )
+            # 使用 expect_response 兼容旧版 sync API
+            with page.expect_response(lambda resp: "/payment/invoice/" in resp.url, timeout=60000) as resp_info:
+                create_invoice_btn.first.click()
+            response = resp_info.value
             new_invoice_url = response.url
             log(f"🎉 捕获到新发票 URL: {new_invoice_url}")
         except PlaywrightTimeoutError:
@@ -107,11 +106,18 @@ def main():
                 log("登录失败，退出")
                 sys.exit(1)
 
-            if not renew_service(page):
-                log("续费失败，退出")
-                sys.exit(1)
-
-            log("🎉 自动续费完成！")
+            # 自动重试逻辑
+            for attempt in range(MAX_RETRIES + 1):
+                success = renew_service(page)
+                if success:
+                    log("🎉 自动续费完成！")
+                    break
+                elif attempt < MAX_RETRIES:
+                    log(f"⚠️ 第 {attempt+1} 次续费失败，准备重试...")
+                    time.sleep(3)
+                else:
+                    log("❌ 所有重试均失败，退出")
+                    sys.exit(1)
 
         except Exception as e:
             log(f"💥 主程序异常: {e}")
